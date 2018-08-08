@@ -1,0 +1,5 @@
+#Cand Crush Saga Level Difficulty
+This project is the first ever project to work on with R. I primarily used ggplot and dplyr to create new column definition,
+summarize after grouping unique levels, and plotting them through graphs.
+Moreover, I was able to receive an idea of usefulness in analyzing the graph with statistical function such as
+Bernoulli Process and Standard Error.
