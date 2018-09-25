@@ -1,0 +1,285 @@
+---
+title: "Data Wrangling Case Studies"
+author: "Jae Kum (Jackie) Kim"
+date: "September 19, 2018"
+output: html_document
+documentclass: article
+classoption: a4paper
+---
+
+# Introduction
+
+This document has case studies I used to self-study, and I've made some few twitches from Linkedin Learning website. I give all credits to **Mr. Mike Chapple** for providing a great tutorial for data wrangling case studies.
+
+## First Case: Coal Consumption
+
+### Goal
+
+The goal of the first case study is to calculate and analyze coal consumptions with respect to regions overtime.
+
+#### Import Data and Summary
+
+Import **tidyverse** package and import coal consumption (skipping first two rows) data from [youcanlearnit](http://594442.youcanlearnit.net/coal.csv):
+
+```{r, message = FALSE, results = 'hide', warning = FALSE}
+
+# Import tidyverse
+library(tidyverse)
+
+# Import coal consumption data file.
+coal <- read_csv("http://594442.youcanlearnit.net/coal.csv", skip = 2)
+coal <- as.tibble(coal)
+```
+
+For a more visible theme, I have imported **ggthemes**:
+```{r, message = FALSE}
+library(ggthemes)
+```
+
+Notice that the first column is not defined.
+Rename the first column into **region**:
+
+```{r, message = FALSE}
+# Rename the first column name
+colnames(coal)[1] <- 'region'
+
+# Check the summary of the data
+glimpse(coal)
+```
+
+#### Convert Class Type
+
+It seems that value of year and coal consumption are listed as characters.
+Use **gather** function to simplify data and convert character to integer/numeric:
+
+```{r, message = FALSE, warning = FALSE}
+# Use gather()
+coal_long <- gather(coal, 'year', 'coal_consumption', -region)
+glimpse(coal_long)
+
+# Convert year to date and coal value to numeric
+coal_long$year <- as.integer(coal_long$year)
+coal_long$coal_consumption <- as.numeric(coal_long$coal_consumption)
+summary(coal_long)
+```
+\pagebreak
+#### Segmenting
+
+We discover that region column is mixed of countries and regions.
+Find all non-country data and categorize them separately:
+
+```{r}
+# Locate regions and create columns of regions
+head(unique(coal_long$region), n = 10)
+noncountries <- c("North America", "Central & South America", "Antarctica",
+                  "Europe", "Eurasia", "Middle East", "Africa", "Asia & Oceania", "World")
+
+# Match and filter data with noncountries and countries
+matches <- which(!is.na(match(coal_long$region, noncountries)))
+
+coal_country <- coal_long[-matches,]
+coal_region <- coal_long[matches,]
+```
+\pagebreak
+
+#### Visualization
+
+We have successfully grouped data into two different categories.
+We are going to use **scatter plot** for visualizing coal consumption of each region with respect to year elapsed.
+
+```{r}
+ggplot(coal_region, aes(x = year, y = coal_consumption)) +
+  geom_line(aes(color = region)) +
+  geom_point(aes(color = region), size = 0.8) +
+  labs(title = "Coal Consumption by Region",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Amount of Coal Consumed") +
+  theme_igray()
+
+
+```
+
+\pagebreak
+
+### Further Analysis on the Graph
+
+Asia & Oceania region was a major contributor of rapid rise in coal consumption with respect to World Average.
+I was interested in finding out which countries from Asia & Oceania are contributing in rapid rise of coal consumption starting year 2000.
+
+```{r, echo= FALSE, message = FALSE}
+library(scales)
+
+coal_country_e <- coal_country %>%
+                  filter(region %in% c("China","India","Japan","Australia"))
+
+ggplot(coal_country_e, aes(x = year, y = coal_consumption, color = region)) +
+  geom_point(size = 0.8) +
+  geom_line() +
+  theme_igray() +
+  labs(title = "Coal Consumption of China, India, and Japan",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Amount of Coal Consumed")
+
+china_coal <- coal_country %>% filter(region == "China")
+as_oc_coal <- coal_region %>% filter(region == "Asia & Oceania")
+chin_coal_per <- china_coal %>% mutate(chin_perc = coal_consumption / as_oc_coal$coal_consumption)
+
+ggplot(chin_coal_per, aes(x = year, y = chin_perc, color = chin_perc)) +
+  geom_point(size = 0.8) +
+  geom_line() +
+  theme_igray() +
+  labs(title = "Contribution of China Relative to Asia & Oceania",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Percentage of Contribution") +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold")) +
+  scale_color_gradient(name = "% Contribution", labels = percent) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+According to two graphs, China began to consume coal rapidly at year 2000, becoming a major contributor in rapid increase of overall Asia & Oceania's overall coal consumption.
+
+\pagebreak
+
+## Second Case: Social Security Disability
+
+### Goal
+
+The goal of this case study is to analyze how much of a **percentage** of people used Internet to apply for Social Security Disability overtime.
+
+Again, import data from [SSD_youcanlearnit]("http://594442.youcanlearnit.net/ssadisability.csv") and attach required packages:
+
+```{r, message = FALSE}
+# Load the tidyverse, lubridate, and stringr
+library(tidyverse)
+library(lubridate)
+library(stringr)
+
+# Read in the coal dataset
+ssa <- read_csv("http://594442.youcanlearnit.net/ssadisability.csv")
+
+# Take a look at how this was imported
+head(glimpse(ssa), n = 10)
+```
+
+### Simplify Data
+
+There are a lot of similar data in rows repeating themselves.
+Simplify the data with **gather** function:
+
+```{r, message = FALSE}
+# Use gather()
+ssa_long <- gather(ssa, month, application, -Fiscal_Year)
+head(ssa_long)
+```
+
+Now we want to separate the month and application method (ex. *Total*).
+Further filter data with **separate** function:
+
+```{r, message = FALSE}
+ssa_long <- separate(ssa_long, month, c("month","application_method"), sep = "_")
+head(ssa_long)
+```
+
+### Abbreviation
+
+First check month if all are abbreviated enough.
+```{r, echo = FALSE}
+unique(ssa_long$month)
+```
+
+Notice that June, July, and August are not abbreviated properly.
+Abbreviate month value. This is where **stringr** package comes in:
+
+```{r, message = FALSE}
+ssa_long$month <- substr(ssa_long$month, 1, 3)
+unique(ssa_long$month)
+```
+
+### Fiscal Year
+
+Now, we would like to replace fiscal year into 20's.
+Overwrite Fiscal Year to 20's:
+
+```{r, message = FALSE}
+ssa_long$Fiscal_Year <- str_replace(ssa_long$Fiscal_Year, "FY","20")
+unique(ssa_long$Fiscal_Year)
+```
+
+
+Next, create a new column that has 1st day of the month:
+
+```{r, message = FALSE}
+ssa_long$Date <- dmy(paste('01', ssa_long$month, ssa_long$Fiscal_Year))
+
+head(unique(ssa_long$Date))
+```
+
+
+Note that Fiscal Year was supposed to start at October of previous year. However, the Date column shows a **double counting of October-December in the same year**. We are going to fix this arbitrary:
+
+```{r}
+# Find Dates with month >= 10 (October, November, December)
+advanced_dates <- which(month(ssa_long$Date) >= 10)
+
+# Subtract the year of these months by 1 to be the previous year
+year(ssa_long$Date[advanced_dates]) <- year(ssa_long$Date[advanced_dates]) - 1
+```
+
+
+After fixing data, we realize that we have unnecessary columns. Remove columns that will not be used for analysis:
+
+```{r, message = FALSE}
+ssa_long$Fiscal_Year <- NULL
+ssa_long$month <- NULL
+```
+
+### Visualization
+
+For visualization, turn the application method to a factor:
+
+```{r}
+ssa_long$application_method <- as.factor(ssa_long$application_method)
+summary(ssa_long)
+```
+
+
+Use **spread** function to separate application method. 
+Our primary goal is to analyze **a number of people using Internet**:
+
+```{r}
+ssa <- spread(ssa_long, application_method, application)
+head(ssa, n = 20)
+```
+
+
+\pagebreak
+Finally, visualize data with scatter plot:
+
+```{r, message = FALSE, warning = FALSE}
+# Create Percentage of people using online
+ssa$online_percentage <- ssa$Internet / ssa$Total
+
+# Create a plot
+ggplot(ssa, aes(x = Date, y = online_percentage)) +
+  geom_point(aes(color = online_percentage)) +
+  theme_solarized() +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold")) +
+  labs(title = "Percentage of People Using Online SSD",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year Elapsed Overtime",
+       y = "Percentage of Online Usage") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_color_gradient(name = "% Online", labels = percent)
+
+```
+
+### Conclusion
+
+Since 2008, an annual percentage of people using online for Social Security Disability application have risen consistently. 
