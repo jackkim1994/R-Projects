@@ -1,0 +1,174 @@
+---
+title: "Global Coal Consumption"
+author: "Jackie Kim"
+date: "12/14/2018"
+output: html_document
+---
+
+# Introduction
+
+This R Markdown is a sample case study to determine which country has the most coal consumption and how much it changes over time.
+
+```{r, message = FALSE, results = 'hide', warning = FALSE}
+
+# Import tidyverse and ggthemes
+library(tidyverse)
+library(ggthemes)
+
+# Import coal consumption data file.
+coal <- read_csv("http://594442.youcanlearnit.net/coal.csv", skip = 2)
+```
+
+
+# Tidying Data
+
+The data is all bundled up and random, so we are going to group it in terms of countries and regions.
+
+```{r, message = FALSE, warning = FALSE}
+# Check the data for coal
+head(coal)
+
+# Rename the First Column as it is undefined
+colnames(coal)[1] <- 'region'
+head(coal)
+
+# Check the summary of the coal data.
+glimpse(coal)
+
+# Use gather() to simplify the summary
+coal_long <- gather(coal, 'year', 'coal_consumption', -region)
+glimpse(coal_long)
+
+# Convert year to date and coal value to numeric
+coal_long$year <- as.integer(coal_long$year)
+coal_long$coal_consumption <- as.numeric(coal_long$coal_consumption)
+summary(coal_long)
+
+# Locate regions and create columns of regions
+head(unique(coal_long$region), n = 10)
+noncountries <- c("North America", "Central & South America", "Antarctica",
+                  "Europe", "Eurasia", "Middle East", "Africa", "Asia & Oceania", "World")
+
+# Match and filter data with noncountries and countries
+matches <- which(!is.na(match(coal_long$region, noncountries)))
+
+coal_country <- coal_long[-matches,]
+coal_region <- coal_long[matches,]
+```
+
+# Data Visualization
+
+We are going to visualize which region has the most coal consumption. From what we can see, Asia and Oceania regions produces the most consumption of coal out of other regions. Moreover, the consumption begins to rise drastically in the year 2000.
+
+```{r}
+ggplot(coal_region, aes(x = year, y = coal_consumption)) +
+  geom_line(aes(color = region)) +
+  geom_point(aes(color = region), size = 0.8) +
+  labs(title = "Coal Consumption by Region",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Amount of Coal Consumed") +
+  theme_igray()
+```
+
+# Finding a Reason
+
+Because Asia and Oceania is the major contributor of the global coal consumption, we are going to determine which country is causing the dramatic increase in coal consumption. Let's assume that we are looking for a major contributor in the year 2005.
+
+```{r}
+# Find Countries that are causing a major coal consumption.
+coal_country %>%
+  filter(year %in% c(2005)) %>%
+  arrange(desc(coal_consumption))
+```
+
+In this top 10 list, China and United States, by a landlside, are the two major producers of the coal consumption.
+However, we are looking for Asia and Oceania, so we will filter the data based on this region.
+
+```{r}
+coal_country %>%
+  filter(region %in% c("China","India","Japan","Australia","Korea, South"))
+```
+
+# Visualizing Countries in Asia and Oceania
+
+Now, we are going to create a graph based on five major coal consuming countries.
+
+```{r, echo= FALSE, message = FALSE}
+library(scales)
+
+coal_country_e <- coal_country %>%
+                  filter(region %in% c("China","India","Japan","Australia", "Korea, South"))
+
+ggplot(coal_country_e, aes(x = year, y = coal_consumption, color = region)) +
+  geom_point(size = 0.8) +
+  geom_line() +
+  theme_igray() +
+  labs(title = "Coal Consumption of China, India, Australlia, Japan, and South Korea",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Amount of Coal Consumed")
+
+```
+
+## Ratio between China and Asia & Oceania Region
+
+Compared to the overall Asia and Oceania Coal Consumption, how much ratio China holds?
+
+```{r message = FALSE}
+# Create functions speicfically for China and Asia & Oceania
+china_coal <- coal_country %>% filter(region == "China")
+as_oc_coal <- coal_region %>% filter(region == "Asia & Oceania")
+chin_coal_per <- china_coal %>% mutate(chin_perc = coal_consumption / as_oc_coal$coal_consumption)
+
+# Plot a graph
+ggplot(chin_coal_per, aes(x = year, y = chin_perc, color = chin_perc)) +
+  geom_point(size = 0.8) +
+  geom_line() +
+  theme_igray() +
+  labs(title = "Contribution of China Relative to Asia & Oceania",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Percentage of Contribution"
+       ) +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold")) +
+  scale_color_gradient(name = "% Contribution", labels = percent) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+It shows that the overall ratio between China and Asia and Oceania Region is at least 55% throughout the year.
+
+## China vs the World
+
+It seems that China holds the majority of the coal consumption in Asia and Oceania Region. Then, how does it compare to the global average?
+
+```{r message = FALSE}
+# Create functions speicfically for China and Asia & Oceania
+china_coal <- coal_country %>% filter(region == "China")
+world_coal <- coal_region %>% filter(region == "World")
+chin_coal_per <- china_coal %>% mutate(chin_perc = coal_consumption / world_coal$coal_consumption)
+
+# Plot a graph
+ggplot(chin_coal_per, aes(x = year, y = chin_perc, color = chin_perc)) +
+  geom_point(size = 0.8) +
+  geom_line() +
+  theme_igray() +
+  labs(title = "China's Coal Consumption Contribution Relative to the World",
+       caption = "Data Extracted @ youcanlearnit",
+       x = "Year",
+       y = "Percentage of Contribution"
+       ) +
+  theme(plot.title = element_text(size = 14, face = "bold"),
+        axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold")) +
+  scale_color_gradient(name = "% Contribution", labels = percent) +
+  scale_y_continuous(labels = scales::percent)
+```
+
+It seems that China has steadily increased its coal consumption since 1980. While there was a slight stagnancy around year 1996-2000, its coal consumption has drastically risen since then.
+
+# Conclusion
+
+While the sample is part of the overall Coal Consumption data, the result does show that China contributes significantly in Coal Consumption compared to other countries or regions. It is an expected result because it has an overwhelming population and its number of citizens continues to rise significantly, contributing to a drastic increase in the coal consumption starting the year 2000.
