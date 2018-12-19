@@ -1,0 +1,71 @@
+---
+title: "Shakespeare Play Analysis"
+output:
+  pdf_document
+documentclass: article
+classoption: a4paper  
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Import libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidytext)
+library(readr)
+library(stringr)
+```
+
+## Import and Tidy Data
+
+The purpose of the sample project is describing the overall atmosphere of the prominent plays of Shakespeare. We will be analyzing words from the plays to conclude whether his masterpieces are either sentimentally positive or negative. 
+First, we will count how many titles and types are in Shakespeare.
+
+```{r, message = FALSE, warning = FALSE}
+# Import Six Shakespeare Acts' Data
+shakespeare = read_csv("shakespeare.csv")
+
+# Pipe the shakespeare data frame to the next line
+shakespeare %>% 
+  # Use count to find out how many titles/types there are
+  count(title,type)
+```
+
+Hamlet, Prince of Denmark, seems to have the most lines compared to other five Shakespeare Plays, having *6776 lines*.
+Next, we will redistribute texts into words and respective line numbers.
+
+```{r}
+tidy_shakespeare <- shakespeare %>%
+  # Group by the titles of the plays
+  group_by(title) %>%
+  # Define a new column linenumber
+  mutate(linenumber = row_number()) %>%
+  # Transform the non-tidy text data to tidy text data
+  unnest_tokens(word, text) %>%
+  ungroup() %>%
+  select(-X1)
+head(tidy_shakespeare)
+```
+
+\break
+
+## Plot the Cleaned Shakespeare Data
+
+```{r, message= FALSE, fig.align = "center"}
+# Plot Sentiment Changes with Respect to PLays
+tidy_shakespeare %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(title, type, index = linenumber %/% 70, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative,
+         fixed_title = str_wrap(title, width = 20)) %>%
+  # Put index on x-axis, sentiment on y-axis, and map comedy/tragedy to fill
+  ggplot(aes(x = index, y = sentiment, fill = type)) +
+  # Make a bar chart with geom_col()
+  geom_col() +
+  # Separate panels for each title with facet_wrap()
+  facet_wrap(~ fixed_title, scales = "free_x") +
+  labs(x = "Index of Shakespeare Plays by 70 Lines Each",
+       y = "Sentiment of Each Plays") +
+  scale_fill_discrete(name = "Type")
+```
